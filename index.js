@@ -50,6 +50,11 @@ app.use('/api/dashboard', require('./routes/dashboardRoutes'));
 app.use('/api/contact', require('./routes/contactRoutes'));
 app.use('/api/chats', require('./routes/chatRoutes'));
 
+// Config routes
+app.get('/api/config/razorpay', (req, res) => {
+    res.json(process.env.RAZORPAY_KEY_ID);
+});
+
 // Socket.io Authentication Middleware
 io.use((socket, next) => {
     const token = socket.handshake.auth.token;
