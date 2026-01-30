@@ -2,7 +2,7 @@ const express = require('express');
 const dotenv = require('dotenv');
 const cors = require('cors');
 const connectDB = require('./config/db');
-const { errorHandler } = require('./middleware/errorMiddleware');
+const { errorHandler, notFound } = require('./middleware/errorMiddleware');
 const http = require('http');
 const { Server } = require('socket.io');
 const jwt = require('jsonwebtoken');
@@ -113,6 +113,7 @@ io.on('connection', (socket) => {
 });
 
 // Error Handler
+app.use(notFound);
 app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;

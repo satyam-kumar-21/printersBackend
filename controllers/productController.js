@@ -3,19 +3,20 @@ const asyncHandler = require('express-async-handler');
 const Product = require('../models/Product');
 const multer = require('multer');
 const path = require('path');
+const cloudinary = require('cloudinary').v2;
 
-// Multer Configuration
-const storage = multer.diskStorage({
-    destination(req, file, cb) {
-        cb(null, 'uploads/');
-    },
-    filename(req, file, cb) {
-        cb(null, `${file.fieldname}-${Date.now()}${path.extname(file.originalname)}`);
-    }
+// Cloudinary Configuration
+cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET
 });
 
+// Multer Configuration for Cloudinary
+const storage = multer.memoryStorage();
+
 function checkFileType(file, cb) {
-    const filetypes = /jpg|jpeg|png/i;
+    const filetypes = /jpg|jpeg|png|webp/i;
     const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
     const mimetype = filetypes.test(file.mimetype);
 
@@ -23,7 +24,7 @@ function checkFileType(file, cb) {
         return cb(null, true);
     } else {
         console.log(`File rejected: ${file.originalname}, mimetype: ${file.mimetype}`);
-        cb('Images only (jpg, jpeg, png)!');
+        cb('Images only (jpg, jpeg, png, webp)!');
     }
 }
 
@@ -32,8 +33,36 @@ const upload = multer({
     fileFilter: function (req, file, cb) {
         console.log('Multer filtering file:', file.originalname);
         checkFileType(file, cb);
+    },
+    limits: {
+        fileSize: 5 * 1024 * 1024 // 5MB limit
     }
 });
+
+// Helper function to upload to Cloudinary
+const uploadToCloudinary = async (buffer, filename) => {
+    return new Promise((resolve, reject) => {
+        const uploadStream = cloudinary.uploader.upload_stream(
+            {
+                folder: 'products',
+                public_id: `${Date.now()}-${filename}`,
+                resource_type: 'image',
+                transformation: [
+                    { width: 800, height: 800, crop: 'limit' },
+                    { quality: 'auto' }
+                ]
+            },
+            (error, result) => {
+                if (error) {
+                    reject(error);
+                } else {
+                    resolve(result.secure_url);
+                }
+            }
+        );
+        uploadStream.end(buffer);
+    });
+};
 
 // @desc    Fetch all products
 // @route   GET /api/products
@@ -106,11 +135,16 @@ const createProduct = asyncHandler(async (req, res) => {
         console.log('CREATE PRODUCT BODY:', req.body);
         console.log('CREATE PRODUCT FILES:', req.files);
 
-        let imagePaths = [];
+        let imageUrls = [];
         if (req.files && req.files.length > 0) {
-            imagePaths = req.files.map(file => `/uploads/${file.filename}`);
+            // Upload images to Cloudinary
+            const uploadPromises = req.files.map(file =>
+                uploadToCloudinary(file.buffer, file.originalname)
+            );
+            imageUrls = await Promise.all(uploadPromises);
+            console.log('Images uploaded to Cloudinary:', imageUrls);
         } else if (req.body.images) {
-            imagePaths = typeof req.body.images === 'string' ? JSON.parse(req.body.images) : req.body.images;
+            imageUrls = typeof req.body.images === 'string' ? JSON.parse(req.body.images) : req.body.images;
         }
 
         const {
@@ -150,12 +184,12 @@ const createProduct = asyncHandler(async (req, res) => {
             shortSpecification,
             overview,
             technicalSpecification,
-            images: imagePaths,
+            images: imageUrls,
             color, width, height, depth, screenSize,
             reviews: parsedReviews,
             numReviews: parsedReviews.length,
-            rating: parsedReviews.length > 0 
-                ? parsedReviews.reduce((acc, item) => item.rating + acc, 0) / parsedReviews.length 
+            rating: parsedReviews.length > 0
+                ? parsedReviews.reduce((acc, item) => item.rating + acc, 0) / parsedReviews.length
                 : 0
         });
 
@@ -213,8 +247,13 @@ const updateProduct = asyncHandler(async (req, res) => {
         }
 
         if (req.files && req.files.length > 0) {
-            const newImagePaths = req.files.map(file => `/uploads/${file.filename}`);
-            product.images = [...currentImages, ...newImagePaths];
+            // Upload new images to Cloudinary
+            const uploadPromises = req.files.map(file =>
+                uploadToCloudinary(file.buffer, file.originalname)
+            );
+            const newImageUrls = await Promise.all(uploadPromises);
+            product.images = [...currentImages, ...newImageUrls];
+            console.log('New images uploaded to Cloudinary:', newImageUrls);
         } else {
             product.images = currentImages;
         }
