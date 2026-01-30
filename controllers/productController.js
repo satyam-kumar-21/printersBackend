@@ -107,8 +107,10 @@ const createProduct = asyncHandler(async (req, res) => {
         console.log('CREATE PRODUCT FILES:', req.files);
 
         let imagePaths = [];
-        if (req.files) {
+        if (req.files && req.files.length > 0) {
             imagePaths = req.files.map(file => `/uploads/${file.filename}`);
+        } else if (req.body.images) {
+            imagePaths = typeof req.body.images === 'string' ? JSON.parse(req.body.images) : req.body.images;
         }
 
         const {
@@ -178,7 +180,7 @@ const updateProduct = asyncHandler(async (req, res) => {
     const {
         title, brand, category, price, oldPrice, countInStock, description,
         shortDetails, shortSpecification, overview, technicalSpecification,
-        color, width, height, depth, screenSize, existingImages, reviews
+        color, width, height, depth, screenSize, reviews
     } = req.body;
 
     const product = await Product.findById(req.params.id);
@@ -204,11 +206,7 @@ const updateProduct = asyncHandler(async (req, res) => {
 
         // Image Update Logic
         let currentImages = [];
-        if (existingImages) {
-            // Handle JSON string from FormData
-            currentImages = typeof existingImages === 'string' ? JSON.parse(existingImages) : existingImages;
-        } else if (req.body.images) {
-            // Fallback to legacy field name if present but not as files
+        if (req.body.images) {
             currentImages = typeof req.body.images === 'string' ? JSON.parse(req.body.images) : req.body.images;
         } else {
             currentImages = product.images;
