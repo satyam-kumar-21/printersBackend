@@ -39,6 +39,9 @@ app.use(express.json());
 app.use('/uploads', express.static('uploads'));
 
 // Routes
+app.get('/', (req, res) => {
+    res.send('Hello from backend!');
+});
 app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/products', require('./routes/productRoutes'));
 app.use('/api/categories', require('./routes/categoryRoutes'));
