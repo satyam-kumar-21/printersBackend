@@ -111,7 +111,7 @@ const sendOTPEmail = async (email, otp, type = 'registration') => {
         `;
 
         const mailOptions = {
-            from: `"Printers App" <${testAccount ? testAccount.user : process.env.EMAIL_FROM || 'noreply@printersapp.com'}>`,
+            from: `"Printers App" <${process.env.EMAIL_USER}>`,
             to: email,
             subject: subject,
             html: html
